@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<GameSetting bSaved="true">
+  <Graphic>
+    <FPS On_Off="0" mode="0" />
+  </Graphic>
+  <Sound>
+    <BGM On_Off="0" mode="1">
+      <M0 volume="0.6342972" />
+      <M1 volume="0.1836154" />
+      <M2 volume="0.249304" />
+      <M3 volume="0.2903674" />
+    </BGM>
+    <Effect On_Off="1" mode="0">
+      <M0 volume="1" />
+    </Effect>
+  </Sound>
+  <Camera>
+    <MovePlane pace="110.9972" useMouse="1" />
+    <Zoom pace="2.860999" />
+  </Camera>
+</GameSetting>

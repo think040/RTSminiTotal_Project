@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<GameData bSaved="true">
+  <UnitCount>
+    <Archer>64</Archer>
+    <Knight>64</Knight>
+    <Viking>64</Viking>
+    <Giant>64</Giant>
+  </UnitCount>
+  <Time>
+    <min>3</min>
+    <sec>30</sec>
+  </Time>
+</GameData>

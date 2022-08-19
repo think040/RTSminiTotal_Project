@@ -1,0 +1,106 @@
+#pragma kernel CSMain
+#pragma kernel CSMain1
+
+#define groupCount 31
+#define groupCountMax 1024
+
+float4 countInfo;
+StructuredBuffer<int> buffer_mask;
+StructuredBuffer<int> buffer_parent;
+StructuredBuffer<float4> buffer_input;
+
+RWStructuredBuffer<float4> buffer_output;
+
+groupshared float4 data[groupCount];
+
+[numthreads(groupCount, 1, 1)]
+void CSMain(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint num = (uint) countInfo.x;
+    uint i = 0;
+    uint idx = gtid.x;
+    
+    data[idx] = buffer_input[idx];
+    
+    GroupMemoryBarrierWithGroupSync();
+            
+    for (i = 0; i < num; i++)
+    {
+        float4 temp = data[idx];
+        if (buffer_mask[idx] == i)
+        {                                    
+            if (buffer_parent[idx] > -1)            
+            {
+                uint pid = buffer_parent[idx];
+                //data[idx] += data[pid];
+                //data[idx].xyz += data[pid].xyz;
+                temp.xyz += data[pid].xyz;
+            }
+            //else
+            //{
+            //    data[idx] = temp;
+            //}
+        }
+        //else
+        //{
+        //    data[idx] = temp;
+        //}
+                
+        data[idx] = temp;
+        
+        GroupMemoryBarrierWithGroupSync();
+    }
+    
+    buffer_output[gid.x * groupCount + idx] = data[idx];
+   
+}
+
+//Error
+groupshared float4 dataMax[groupCountMax];
+
+[numthreads(groupCountMax, 1, 1)]
+void CSMain1(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint num = (uint) countInfo.x;
+    uint i = 0;
+    uint idx = gtid.x;
+    
+    if (idx < groupCount)
+    {                    
+        dataMax[idx] = buffer_input[idx];
+        
+        GroupMemoryBarrierWithGroupSync();
+            
+        //for (i = 0; i < num; i++)
+        //{
+        //    float4 temp = data[idx];
+        //    if (buffer_mask[idx] == i)
+        //    {
+        //        if (buffer_parent[idx] > -1)
+        //        {
+        //            uint pid = buffer_parent[idx];
+        //        //data[idx] += data[pid];
+        //            dataMax[idx].xyz += data[pid].xyz;
+        //        }
+        //        else
+        //        {
+        //            dataMax[idx] = temp;
+        //        }
+        //    }
+        //    else
+        //    {
+        //        dataMax[idx] = temp;
+        //    }
+        //        
+        //    GroupMemoryBarrierWithGroupSync();
+        //}
+        //
+        //buffer_output[gid.x * groupCount + idx] = dataMax[idx];
+    }
+    else
+    {
+        dataMax[idx] = 0.0f;
+        
+        GroupMemoryBarrierWithGroupSync();
+    }
+}

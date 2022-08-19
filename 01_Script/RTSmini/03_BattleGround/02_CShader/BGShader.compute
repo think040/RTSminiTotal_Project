@@ -1,0 +1,108 @@
+#pragma kernel CS_Static_Ins
+
+struct VertexIn
+{
+    float3 posL;
+    float3 normalL;
+    float4 tangentL;
+    int4 boneI;
+    float4 boneW;
+};
+
+//struct VertexInStatic
+//{
+//    float3 posL;
+//    float3 normalL;
+//    float4 tangentL;   
+//};
+
+struct PerBone
+{
+    float4x4 W;
+    float4x4 W_IT;
+};
+
+//struct PerInstance
+//{
+//    float4x4 W;
+//    float4x4 W_IT;
+//};
+
+struct VertexOut
+{
+    float3 posW;
+    float3 normalW;
+    float4 tangentW;
+};
+
+
+StructuredBuffer<VertexIn> vIn;
+StructuredBuffer<PerBone> perBone;
+
+RWStructuredBuffer<VertexOut> vOut;
+//RWTexture2D<float4> vOutTex;
+
+
+//#define iCount 16
+//#define vtxCount 2972
+#define vtCount 1024
+//#define vgCount 3
+//#define boneCount 72
+
+//StructuredBuffer<PerInstance> perIns;
+
+//int countInfo[4];
+float4 countInfo;
+//groupshared float4x4 W_bone[boneCount];
+//groupshared float4x4 W_bone_IT[boneCount];
+
+Texture2D<float> testCull;
+int cullOffset;
+
+
+
+[numthreads(vtCount, 1, 1)]
+void CS_Static_Ins(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gindex : SV_GroupIndex)
+{
+    uint insCount = (uint) countInfo[0];
+    uint vtxCount = (uint) countInfo[1];
+    uint vgCount = (uint) countInfo[2];
+    //uint boneCount = (uint) countInfo[3];
+    uint stCount = (uint) countInfo[3];
+    uint dvCount = vgCount * vtCount;
+        
+    //int insCount = 4;
+    //int vtxCount = 2588;
+    //int vgCount = 3;
+    //int boneCount = 72;
+    //int dvCount = vgCount * vtCount;
+    
+    int i = 0;
+    uint iid = gid.x / vgCount;
+    uint vgid = gid.x % vgCount;
+    float3 posW = float3(0.0f, 0.0f, 0.0f);
+    float3 normalW = float3(0.0f, 0.0f, 0.0f);
+    float3 tangentW = float3(0.0f, 0.0f, 0.0f);
+    
+    uint vtxIdx = vgid * vtCount + gtid.x;
+                  
+    
+    if (vtxIdx < vtxCount)
+    {
+        VertexIn vin = vIn[vtxIdx];
+    
+        uint boneI = (uint) vin.boneI.x;
+                
+        {
+            PerBone bone = perBone[iid * stCount + boneI];
+            posW = mul(bone.W, float4(vin.posL, 1.0f)).xyz;
+            normalW = mul((float3x3) bone.W_IT, vin.normalL);
+            tangentW = mul((float3x3) bone.W_IT, vin.tangentL.xyz);
+        }
+
+        vOut[iid * dvCount + vgid * vtCount + gtid.x].posW = posW;
+        vOut[iid * dvCount + vgid * vtCount + gtid.x].normalW = normalW;
+        vOut[iid * dvCount + vgid * vtCount + gtid.x].tangentW = float4(tangentW, 0.0f);
+    }
+}
+

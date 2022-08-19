@@ -1,0 +1,400 @@
+#include "../../../Utility/02_CShader/UtilityCS.hlsl"
+
+#pragma kernel CS_TrW
+#pragma kernel CS_TargetPos;
+#pragma kernel CS_TargetPos_CubeXZ;
+#pragma kernel CS_TargetEnemy;
+
+StructuredBuffer<float4x4> trM_Buffer;
+
+RWStructuredBuffer<float4x4> trW_Buffer;
+RWStructuredBuffer<float4> circle_Buffer;
+
+[numthreads(64, 1, 1)] //4 * 64 = 256 (4, 1, 1)
+void CS_TrW (uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint id = gid.x * 64 + gtid.x;
+    float4x4 M = trM_Buffer[id];
+    float4 circle = circle_Buffer[id];
+    float3 c = float3(circle.x, 0.0f, circle.z);
+    float r = circle.w;
+    
+    float3 pos = M.v3c0;
+    float4 rot = M.v4c1;
+    float3 sca = M.v3c2;
+            
+    M = Transform::GetW(pos, rot, sca);               
+    
+    c = float3(pos.x, 0.0f, pos.z);
+    
+    //float s = max(sca.x, sca.z);    
+    //r = s * r;
+    //r = s * r * 0.5f;
+    
+    trW_Buffer[id] = M;
+    circle_Buffer[id] = float4(c, r);
+}
+
+
+int count;
+StructuredBuffer<float3> block_Buffer;
+StructuredBuffer<int> random_Buffer;
+StructuredBuffer<int> active_Buffer;
+
+RWStructuredBuffer<float3> targetPos_Buffer;
+
+groupshared bool shTest[256];
+
+
+[numthreads(256, 1, 1)] //(256, 1, 1)
+void CS_TargetPos(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint id0 = gid.x;
+    uint id1 = gtid.x;
+    int i = 0;        
+     
+    bool ba0 = active_Buffer[id0] == 1 ? true : false;
+    bool ba1 = active_Buffer[id1] == 1 ? true : false;  
+    
+    float3 tPos = float3(0.0f, 0.0f, 0.0f);
+    float4x4 W;
+    float r;
+        
+    shTest[id1] = false;
+    
+    GroupMemoryBarrierWithGroupSync();
+       
+    
+    if(0 <= id1 && id1 < count)
+    {        
+        tPos = targetPos_Buffer[id0];
+        float4 c0 = circle_Buffer[id0];
+        c0.xyz = tPos;
+        c0.w *= 1.15f;
+    
+        float4 c1 = circle_Buffer[id1];
+        c1.w *= 1.15f;
+       
+        bool bTest = false;       
+        
+        //if (id0 != id1 && ba0 && ba1)
+        if (id0 != id1)        
+        {                                
+            if (distance(c0.xyz, c1.xyz) <= (c0.w + c1.w))
+            {
+                bTest = true;
+            }
+        }
+        
+        shTest[id1] = bTest;
+    }
+        
+    GroupMemoryBarrierWithGroupSync();
+
+    if (id1 == 0)
+    {
+        bool bTest = false;
+        
+        W = trW_Buffer[id0];
+        r = circle_Buffer[id0].w;
+
+        [loop]
+        for (i = 0; i < count; i++)       
+        {
+            if (shTest[i] == true)
+            {
+                bTest = true;
+                break;
+            }
+        }
+        
+        if (bTest)
+        {
+            tPos = tPos + mul((float3x3) W, block_Buffer[random_Buffer[id0]] * r * 0.25f);
+            //tPos = W.v3c3;
+        }
+        //tPos = W.v3c3;
+        
+        targetPos_Buffer[id0] = tPos;
+    }
+       
+}
+
+
+StructuredBuffer<float3> refTargetPos_Buffer;
+StructuredBuffer<float4> cubeXZplane_Buffer;
+StructuredBuffer<float3> cubeCenter_Buffer;
+
+RWStructuredBuffer<float4x4> debug_Buffer;
+
+groupshared float3 shTargetPos[2];
+groupshared bool shPlaneOut[2][4][4];
+groupshared bool shCubeIn[2][4];
+groupshared int shModeData[2];
+
+[numthreads(256, 1, 1)] //(256, 1, 1)
+void CS_TargetPos_CubeXZ(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint id0 = gid.x;
+    uint id1 = gtid.x;
+    int i = 0;
+    int j = 0;
+     
+    bool ba0 = active_Buffer[id0] == 1 ? true : false;
+    bool ba1 = active_Buffer[id1] == 1 ? true : false;
+    
+    float3 tPos = float3(0.0f, 0.0f, 0.0f);
+    float4x4 W;
+    float r;
+        
+    if(id1 == 0)
+    {
+        shTargetPos[0] = refTargetPos_Buffer[id0];
+        shTargetPos[1] = targetPos_Buffer[id0];    
+        
+        //shTargetPos[0] = float3(10.0f, 0.0f, 0.0f);
+        //shTargetPos[1] = float3(10.0f, 0.0f, 0.0f);
+    }
+    
+    GroupMemoryBarrierWithGroupSync();
+    
+    shTest[id1] = false;
+    
+    GroupMemoryBarrierWithGroupSync();
+       
+    
+    if (id1 < count)
+    {
+        tPos = targetPos_Buffer[id0];
+        float4 c0 = circle_Buffer[id0];
+        c0.xyz = tPos;
+        c0.w *= 1.15f;
+    
+        float4 c1 = circle_Buffer[id1];
+        c1.w *= 1.15f;
+       
+        bool bTest = false;
+        
+        //if (id0 != id1 && ba0 && ba1)
+        if (id0 != id1)
+        {
+            if (distance(c0.xyz, c1.xyz) <= (c0.w + c1.w))
+            {
+                bTest = true;
+            }
+        }
+        
+        shTest[id1] = bTest;
+    }
+        
+    GroupMemoryBarrierWithGroupSync();
+    
+    if (id1 < 32)  // 2 * 4 * 4
+    {
+        bool bOut = false;
+            
+        int m0 = id1 / 16;
+        int m1 = id1 % 16;
+        int m2 = m1 / 4;
+        int m3 = m1 % 4;
+            
+        float3 pos = shTargetPos[m0];
+        float4 plane = cubeXZplane_Buffer[m1];
+        if (dot(plane.xyz, pos) + plane.w > 0.0f)
+        {
+             bOut = true;
+        }
+        
+        shPlaneOut[m0][m2][m3] = bOut;
+    }     
+    
+    GroupMemoryBarrierWithGroupSync();
+    
+    if(id1 < 8) // 2 * 4
+    {
+        bool bIn = true;
+        
+        int m0 = id1 / 4;
+        int m1 = id1 % 4;
+                        
+        for (i = 0; i < 4; i++)
+        {
+            if (shPlaneOut[m0][m1][i] == true)
+            {
+                bIn = false;
+                break;
+            }
+        }
+        
+        shCubeIn[m0][m1] = bIn;
+    }
+    
+    GroupMemoryBarrierWithGroupSync();
+            
+    if (id1 < 2)
+    {
+        int cid = -1;
+      
+        int m0 = id1;
+                        
+        for (i = 0; i < 4; i++)
+        {
+            if (shCubeIn[m0][i] == true)
+            {
+                cid = i;
+                break;
+            }
+        }
+        
+        shModeData[m0] = cid;
+    }
+    
+    GroupMemoryBarrierWithGroupSync();
+
+    if (id1 == 0)
+    {
+        bool bTest = false;
+        
+        W = trW_Buffer[id0];
+        r = circle_Buffer[id0].w;
+
+        [loop]
+        for (i = 0; i < count; i++)
+        {
+            if (shTest[i] == true)
+            {
+                bTest = true;
+                break;
+            }
+        }
+        
+        int mIdx0 = shModeData[0]; //rtTargetPos
+        int mIdx1 = shModeData[1]; //targetPos
+        
+        float3 cCenter = float3(0.0f, 0.0f, 0.0f);
+        if(mIdx0 > -1.0f)
+        {
+            cCenter = cubeCenter_Buffer[mIdx0];
+        }
+         
+        float3 v0 = cCenter - tPos;
+        if(mIdx1 > -1.0f)
+        {            
+            if (bTest)
+            {                
+                //tPos = tPos + mul((float3x3) W, block_Buffer[random_Buffer[id0]] * r * 0.25f) + 0.001f * r * v0;
+                tPos = tPos + mul((float3x3) W, block_Buffer[random_Buffer[id0]] * r * 0.05f);  // 0.5f 0.375f 0.25f 0.05f
+            }        
+        }
+        else
+        {            
+            float dd = dot(v0, v0);
+            if (dd > 0.0f)
+            {
+                tPos = tPos + 1.0f * r * v0 * rsqrt(dd);
+                //tPos = tPos + 15.0f * r * normalize(v0);
+                //tPos = tPos + float3(5.0f, 0.0f, 0.0f);
+            }                       
+        }
+                
+              
+        targetPos_Buffer[id0] = tPos;      
+        
+        //float4x4 debug = f4x4Zero;
+        //debug.v4r0 = float4(cCenter, (float) mIdx0);
+        //debug.v4r1 = float4(v0, (float) mIdx1);                
+        //
+        //debug_Buffer[id0] = debug;
+        
+    }
+       
+}
+
+StructuredBuffer<float4> unitData_Buffer;
+
+RWStructuredBuffer<float4> minDist_Buffer;
+
+groupshared float4 shMinDist[256];
+
+[numthreads(256, 1, 1)] 
+void CS_TargetEnemy(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gidx : SV_GroupIndex)
+{
+    uint id0 = gid.x;
+    uint id1 = gtid.x;       
+    
+    bool ba0 = active_Buffer[id0] == 1 ? true : false;
+    bool ba1 = active_Buffer[id1] == 1 ? true : false;
+    
+    float3 pos0 = circle_Buffer[id0].xyz;
+    float3 pos1 = circle_Buffer[id1].xyz;
+    
+    int pnum0 = (int) unitData_Buffer[id0].x;
+    int pnum1 = (int) unitData_Buffer[id1].x;
+    
+    shMinDist[id1].x = id1;   
+    shMinDist[id1].y = 0.0f;
+    shMinDist[id1].z = -1.0f;
+    shMinDist[id1].w = 0.0f;
+    
+    if (0 <= id1 && id1 < count)
+    {
+        if ((id0 != id1) && (ba0 && ba1) && (pnum0 != pnum1))
+        {
+            shMinDist[id1].y = distance(pos0, pos1);
+            shMinDist[id1].z = 1.0f;
+        }
+    }
+            
+    GroupMemoryBarrierWithGroupSync();
+    
+    
+    uint i = 0; 
+    [loop]
+        
+    if(id0 < count)
+    {
+        for (i = 0; i < 8; i++)
+        {
+            if (id1 % (uint) pow(2.0f, (float) (i + 1)) == 0)
+            {
+                uint offset = (uint) pow(2.0f, (float) (i));
+                uint a = id1;
+                uint b = a + offset;
+            
+                float d0 = shMinDist[a].y;
+                float d1 = shMinDist[b].y;
+            
+                float e0 = shMinDist[a].z;
+                float e1 = shMinDist[b].z;
+            
+                if (e0 < 0.0f)
+                {
+                    shMinDist[a] = shMinDist[b];
+                }
+                else
+                {
+                    if (d0 > d1 && e1 > 0.0f)
+                    {
+                        shMinDist[a] = shMinDist[b];
+                    }
+                }
+            }
+        
+            GroupMemoryBarrierWithGroupSync();
+        }
+    }               
+    
+    if(id1 == 0)
+    {                         
+        float4 minDist = shMinDist[0];   
+        float viewDist = unitData_Buffer[id0].y;
+        if (minDist.y > viewDist)
+        {
+            minDist.z = -1.0f;
+        }
+        
+        minDist_Buffer[id0] = minDist;
+    }
+}
+
+

@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<UnitData bSaved="true">
+  <Archer>
+    <maxHp>150</maxHp>
+    <hitHp>5</hitHp>
+    <healHp>4</healHp>
+    <viewRadius>35</viewRadius>
+    <attackRadius>30</attackRadius>
+  </Archer>
+  <Knight>
+    <maxHp>200</maxHp>
+    <hitHp>10</hitHp>
+    <healHp>4</healHp>
+    <viewRadius>30</viewRadius>
+    <attackRadius>1.5</attackRadius>
+  </Knight>
+  <Viking>
+    <maxHp>200</maxHp>
+    <hitHp>10</hitHp>
+    <healHp>1</healHp>
+    <viewRadius>100</viewRadius>
+    <attackRadius>1.5</attackRadius>
+  </Viking>
+  <Giant>
+    <maxHp>250</maxHp>
+    <hitHp>20</hitHp>
+    <healHp>1</healHp>
+    <viewRadius>100</viewRadius>
+    <attackRadius>1.5</attackRadius>
+  </Giant>
+</UnitData>

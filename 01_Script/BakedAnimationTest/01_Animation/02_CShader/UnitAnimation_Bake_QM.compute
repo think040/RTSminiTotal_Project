@@ -1,0 +1,238 @@
+#pragma kernel CS_BoneSample
+#pragma kernel CS_BoneOffset
+#pragma kernel CS_BoneVertex
+#include "../../../Utility/02_CShader/UtilityCS.hlsl"
+
+#define maxBoneCount 1024
+#define maxVertexCount 1024
+
+struct AnimPlayer
+{
+    uint type; //loop or cross
+    
+    uint2 cid; //clip index
+    uint2 fid; //frmae index
+    float3 u;
+    
+    uint cCount;
+    uint fCount;
+    uint bCount;
+};
+
+struct VertexIn
+{
+    float3 posL;
+    float3 normalL;
+    float4 tangentL;
+    int4 boneI;
+    float4 boneW;
+};
+
+struct VertexOut
+{
+    float3 posW;
+    float3 normalW;
+    float4 tangentW;
+};
+
+float4 countInfo_sample;
+StructuredBuffer<AnimPlayer> animPlayer;
+Texture3D<float4> boneSample_input;
+
+StructuredBuffer<float4x4> boneSample_root;
+RWStructuredBuffer<float4x4> boneSample_output;
+
+[numthreads(maxBoneCount, 1, 1)]
+void CS_BoneSample(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gindex : SV_GroupIndex)
+{
+    uint iid = gid.x;
+    uint boneCount = (uint) countInfo_sample.x;
+    
+    AnimPlayer player = animPlayer[iid];
+    uint type = player.type;
+        
+    if (gtid.x < boneCount)
+    {
+        uint boneId = gtid.x;                
+        
+        float4x4 tr;
+        float4x4 tr0;
+        float4x4 tr1;
+        
+        float3 t;
+        float4 r;
+        float3 s;
+
+        
+        if (type == 0)
+        {
+           
+            {
+                uint cid0 = player.cid[0];
+                uint fid0 = player.fid[0];
+                float u0 = player.u[0];
+            
+                float3 t00 = boneSample_input[int3(boneId * 4 + 0, fid0 + 0, cid0)].xyz;
+                float4 r00 = boneSample_input[int3(boneId * 4 + 1, fid0 + 0, cid0)];
+                float3 s00 = boneSample_input[int3(boneId * 4 + 2, fid0 + 0, cid0)].xyz;
+                
+                float3 t01 = boneSample_input[int3(boneId * 4 + 0, fid0 + 0, cid0)].xyz;
+                float4 r01 = boneSample_input[int3(boneId * 4 + 1, fid0 + 0, cid0)];
+                float3 s01 = boneSample_input[int3(boneId * 4 + 2, fid0 + 0, cid0)].xyz;
+            
+                t = lerp(t00, t01, u0);
+                r = Quaternion::slerp(r00, r01, u0);
+                s = lerp(s00, s01, u0);                               
+            }
+        }
+        else
+        {
+            {
+                uint cid0 = player.cid[0];
+                uint fid0 = player.fid[0];
+                float u0 = player.u[0];
+            
+                float3 t00 = boneSample_input[int3(boneId * 4 + 0, fid0 + 0, cid0)].xyz;
+                float4 r00 = boneSample_input[int3(boneId * 4 + 1, fid0 + 0, cid0)];
+                float3 s00 = boneSample_input[int3(boneId * 4 + 2, fid0 + 0, cid0)].xyz;
+                
+                float3 t01 = boneSample_input[int3(boneId * 4 + 0, fid0 + 0, cid0)].xyz;
+                float4 r01 = boneSample_input[int3(boneId * 4 + 1, fid0 + 0, cid0)];
+                float3 s01 = boneSample_input[int3(boneId * 4 + 2, fid0 + 0, cid0)].xyz;
+            
+                float3 t = lerp(t00, t01, u0);
+                float4 r = Quaternion::slerp(r00, r01, u0);
+                float3 s = lerp(s00, s01, u0);
+                
+                tr0.v3c0 = t;
+                tr0.v4c1 = r;
+                tr0.v3c2 = s;
+            }
+            
+            {                 
+                uint cid1 = player.cid[1];
+                uint fid1 = player.fid[1];
+                float u1 = player.u[1];
+            
+                float3 t10 = boneSample_input[int3(boneId * 4 + 0, fid1 + 0, cid1)].xyz;
+                float4 r10 = boneSample_input[int3(boneId * 4 + 1, fid1 + 0, cid1)];
+                float3 s10 = boneSample_input[int3(boneId * 4 + 2, fid1 + 0, cid1)].xyz;
+                
+                float3 t11 = boneSample_input[int3(boneId * 4 + 0, fid1 + 0, cid1)].xyz;
+                float4 r11 = boneSample_input[int3(boneId * 4 + 1, fid1 + 0, cid1)];
+                float3 s11 = boneSample_input[int3(boneId * 4 + 2, fid1 + 0, cid1)].xyz;
+            
+                float3 t = lerp(t10, t11, u1);
+                float4 r = Quaternion::slerp(r10, r11, u1);
+                float3 s = lerp(s10, s11, u1);
+                
+                tr1.v3c0 = t;
+                tr1.v4c1 = r;
+                tr1.v3c2 = s;
+            }
+            
+                       
+            {
+                float u = player.u[2];
+                
+                float3 t0 = tr0.v4c0;
+                float4 r0 = tr0.v4c1;
+                float3 s0 = tr0.v3c2;
+                
+                float3 t1 = tr1.v4c0;
+                float4 r1 = tr1.v4c1;
+                float3 s1 = tr1.v3c2;
+            
+                t = lerp(t0, t1, u);
+                r = Quaternion::slerp(r0, r1, u);
+                s = lerp(s0, s1, u);                                              
+            }
+        }
+        
+        {
+            tr = Transform::GetW(t, r, s);
+            
+            float4x4 root = boneSample_root[iid];
+            tr = mul(root, tr);
+        }
+                       
+       
+        boneSample_output[iid * boneCount + gtid.x] = tr;
+    }
+   
+}
+
+
+float4 countInfo_offset;
+StructuredBuffer<uint> boneOffset_idx;
+StructuredBuffer<float4x4> boneOffset_input;
+
+RWStructuredBuffer<float4x4> bone;
+
+[numthreads(maxBoneCount, 1, 1)]
+void CS_BoneOffset(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gindex : SV_GroupIndex)
+{
+    uint boneCount0 = (uint) countInfo_sample.x;
+    uint boneCount1 = (uint) countInfo_offset.x;
+    uint iid = gid.x;
+    
+    if (gtid.x < boneCount1)
+    {
+        uint bidx = iid * boneCount0 + boneOffset_idx[gtid.x];
+        uint idx = iid * boneCount1 + gtid.x;
+                      
+        float4x4 wbone = boneSample_output[bidx];
+        float4x4 offset = boneOffset_input[gtid.x];
+                
+        float4x4 final = mul(wbone, offset);
+        bone[idx] = final;
+    }
+}
+
+
+float4 countInfo_vertex;
+StructuredBuffer<VertexIn> vIn;
+
+RWStructuredBuffer<VertexOut> vOut;
+
+[numthreads(maxVertexCount, 1, 1)]
+void CS_BoneVertex(uint3 dtid : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint3 gtid : SV_GroupThreadID, uint gindex : SV_GroupIndex)
+{
+    uint insCount = (uint) countInfo_vertex[0];
+    uint vtxCount = (uint) countInfo_vertex[1];
+    uint vgCount = (uint) countInfo_vertex[2];
+    uint boneCount = (uint) countInfo_vertex[3];
+    uint dvCount = vgCount * maxVertexCount;
+    
+    int i = 0;
+    uint iid = gid.x / vgCount;
+    uint vgid = gid.x % vgCount;
+    float3 posW = float3(0.0f, 0.0f, 0.0f);
+    float3 normalW = float3(0.0f, 0.0f, 0.0f);
+    float3 tangentW = float3(0.0f, 0.0f, 0.0f);
+    
+    uint vtxIdx = vgid * maxVertexCount + gtid.x;
+        
+    if (vtxIdx < vtxCount)
+    {
+        VertexIn vin = vIn[vtxIdx];
+    
+        uint4 boneI = uint4((uint) vin.boneI.x, (uint) vin.boneI.y, (uint) vin.boneI.z, (uint) vin.boneI.w);
+        float4 boneW = vin.boneW;
+
+        boneI += (iid * boneCount) * uint4(1, 1, 1, 1);
+    
+        for (i = 0; i < 4; i++)
+        {
+            float4x4 W = bone[boneI[i]];
+            posW += boneW[i] * mul(W, float4(vin.posL, 1.0f)).xyz;
+            normalW += boneW[i] * mul((float3x3) W, vin.normalL);
+            tangentW += boneW[i] * mul((float3x3) W, vin.tangentL.xyz);
+        }
+
+        uint idxOut = iid * dvCount + vgid * maxVertexCount + gtid.x;
+        vOut[idxOut].posW = posW;
+        vOut[idxOut].normalW = normalW;
+        vOut[idxOut].tangentW = float4(tangentW, 0.0f);
+    }
+}
